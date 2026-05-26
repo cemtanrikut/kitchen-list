@@ -145,7 +145,10 @@ function FileCard({ file, onRemove }) {
       {isOpen && (
         <div className="file-card-preview">
           {datesWithData.map((date) => {
-            const items = file.itemsByDate[date] || {}
+            const items = { ...(file.itemsByDate[date] || {}) }
+            for (const [n, q] of Object.entries(file.koksmenuByDate?.[date] || {})) {
+              items[n] = (items[n] || 0) + q
+            }
             const entries = Object.entries(items).sort((a, b) => b[1] - a[1])
             const top = entries.slice(0, PREVIEW_ITEMS)
             const remaining = entries.length - top.length

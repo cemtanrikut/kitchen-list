@@ -39,6 +39,41 @@ function isRowEmpty(row) {
   return row.every((c) => (c ?? '').toString().trim() === '')
 }
 
+const KOKSMENU_PREFIX = /^\s*koksmenu\s*\/\s*/i
+
+// Title-case a SHOUTING package label: "TAVUK SULTAN" -> "Tavuk Sultan",
+// "KOZLENMIS BIBER&DOMATES" -> "Kozlenmis Biber&Domates". Uses en-US casing on
+// purpose — these labels are plain ASCII, so we avoid the Turkish I/İ rules that
+// would otherwise turn "ISLIM" into "Islım".
+function toTitleCase(name) {
+  return name
+    .toLocaleLowerCase('en-US')
+    .replace(/(^|[^\p{L}\p{N}])(\p{L})/gu, (_, sep, ch) =>
+      sep + ch.toLocaleUpperCase('en-US'),
+    )
+}
+
+// Orders placed via the chef's package menu arrive as "KOKSMENU / <dish>". These
+// portions are kept in their own bucket (never folded into the à la carte dish of
+// the same name) and land in the dedicated "KOKSMENU" category at export time. We
+// strip the SHOUTING package label down to a plain Title-Case dish name so the
+// "KOKSMENU /" prefix never surfaces. classify() reports whether a raw cell is a
+// package item and returns the cleaned dish name either way.
+function classify(raw) {
+  if (KOKSMENU_PREFIX.test(raw)) {
+    return {
+      koksmenu: true,
+      name: toTitleCase(raw.replace(KOKSMENU_PREFIX, '').trim()),
+    }
+  }
+  return { koksmenu: false, name: raw }
+}
+
+function bump(map, date, name, qty) {
+  if (!map[date]) map[date] = {}
+  map[date][name] = (map[date][name] || 0) + qty
+}
+
 function detectType(filename, rows) {
   const lname = filename.toLowerCase()
 
@@ -74,8 +109,11 @@ function parseDailyCounts(filename, rows) {
   }
 
   if (!isValidIso(dateIso)) {
-    return { dates: [], itemsByDate: {} }
+    return { dates: [], itemsByDate: {}, koksmenuByDate: {} }
   }
+
+  const itemsByDate = { [dateIso]: {} }
+  const koksmenuByDate = { [dateIso]: {} }
 
   let headerRowIdx = -1
   for (let i = 0; i < rows.length; i++) {
@@ -88,35 +126,37 @@ function parseDailyCounts(filename, rows) {
     }
   }
   if (headerRowIdx === -1) {
-    return { dates: [dateIso], itemsByDate: { [dateIso]: {} } }
+    return { dates: [dateIso], itemsByDate, koksmenuByDate }
   }
 
-  const items = {}
   for (let i = headerRowIdx + 1; i < rows.length; i++) {
-    const name = cell(rows[i], 0)
-    const qtyRaw = cell(rows[i], 1)
+    const { koksmenu, name } = classify(cell(rows[i], 0))
     if (!name) continue
-    const qty = parseInt(qtyRaw, 10)
-    if (Number.isNaN(qty)) continue
-    items[name] = (items[name] || 0) + qty
+    const qty = parseInt(cell(rows[i], 1), 10)
+    if (Number.isNaN(qty) || qty === 0) continue
+    bump(koksmenu ? koksmenuByDate : itemsByDate, dateIso, name, qty)
   }
 
-  return { dates: [dateIso], itemsByDate: { [dateIso]: items } }
+  return { dates: [dateIso], itemsByDate, koksmenuByDate }
 }
 
 function parseKitchenOverview(filename, rows) {
   const m = filename.match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/)
-  if (!m) return { dates: [], itemsByDate: {} }
+  if (!m) return { dates: [], itemsByDate: {}, koksmenuByDate: {} }
 
   const startIso = m[1]
   const endIso = m[2]
   if (!isValidIso(startIso) || !isValidIso(endIso)) {
-    return { dates: [], itemsByDate: {} }
+    return { dates: [], itemsByDate: {}, koksmenuByDate: {} }
   }
 
   const dates = dateRange(startIso, endIso)
   const itemsByDate = {}
-  for (const d of dates) itemsByDate[d] = {}
+  const koksmenuByDate = {}
+  for (const d of dates) {
+    itemsByDate[d] = {}
+    koksmenuByDate[d] = {}
+  }
 
   const sectionStarts = []
   for (let i = 0; i < rows.length; i++) {
@@ -129,7 +169,7 @@ function parseKitchenOverview(filename, rows) {
     }
   }
 
-  if (sectionStarts.length === 0) return { dates, itemsByDate }
+  if (sectionStarts.length === 0) return { dates, itemsByDate, koksmenuByDate }
 
   const headerRow = rows[sectionStarts[0]]
   const dayToColIdx = {}
@@ -151,7 +191,7 @@ function parseKitchenOverview(filename, rows) {
     }
 
     for (let i = startIdx; i < endIdx; i++) {
-      const name = cell(rows[i], 0)
+      const { koksmenu, name } = classify(cell(rows[i], 0))
       if (!name) continue
       for (const date of dates) {
         const dutchDay = isoToDutchDay(date)
@@ -159,17 +199,17 @@ function parseKitchenOverview(filename, rows) {
         if (colIdx == null) continue
         const qty = parseInt(cell(rows[i], colIdx), 10)
         if (Number.isNaN(qty) || qty === 0) continue
-        itemsByDate[date][name] = (itemsByDate[date][name] || 0) + qty
+        bump(koksmenu ? koksmenuByDate : itemsByDate, date, name, qty)
       }
     }
   }
 
-  return { dates, itemsByDate }
+  return { dates, itemsByDate, koksmenuByDate }
 }
 
 function parseKitchenListReport(filename, rows) {
   const headerRow = rows[1]
-  if (!headerRow) return { dates: [], itemsByDate: {} }
+  if (!headerRow) return { dates: [], itemsByDate: {}, koksmenuByDate: {} }
 
   const colIdxToDate = {}
   for (let i = 1; i < headerRow.length; i++) {
@@ -182,28 +222,33 @@ function parseKitchenListReport(filename, rows) {
 
   const dates = Array.from(new Set(Object.values(colIdxToDate))).sort()
   const itemsByDate = {}
-  for (const d of dates) itemsByDate[d] = {}
+  const koksmenuByDate = {}
+  for (const d of dates) {
+    itemsByDate[d] = {}
+    koksmenuByDate[d] = {}
+  }
 
   for (let i = 2; i < rows.length; i++) {
-    const name = cell(rows[i], 0)
+    const raw = cell(rows[i], 0)
+    if (!raw || raw.toLowerCase().startsWith('grand total')) continue
+    const { koksmenu, name } = classify(raw)
     if (!name) continue
-    if (name.toLowerCase().startsWith('grand total')) continue
 
     for (const [colIdxStr, date] of Object.entries(colIdxToDate)) {
       const colIdx = Number(colIdxStr)
       const qty = parseInt(cell(rows[i], colIdx), 10)
       if (Number.isNaN(qty) || qty === 0) continue
-      itemsByDate[date][name] = (itemsByDate[date][name] || 0) + qty
+      bump(koksmenu ? koksmenuByDate : itemsByDate, date, name, qty)
     }
   }
 
-  return { dates, itemsByDate }
+  return { dates, itemsByDate, koksmenuByDate }
 }
 
 function buildResult(filename, rows) {
   const type = detectType(filename, rows)
 
-  let analysis = { dates: [], itemsByDate: {} }
+  let analysis = { dates: [], itemsByDate: {}, koksmenuByDate: {} }
   if (type === FILE_TYPES.DAILY_COUNTS) {
     analysis = parseDailyCounts(filename, rows)
   } else if (type === FILE_TYPES.KITCHEN_OVERVIEW) {
@@ -212,13 +257,20 @@ function buildResult(filename, rows) {
     analysis = parseKitchenListReport(filename, rows)
   }
 
-  const totalItems = Object.values(analysis.itemsByDate).reduce(
-    (sum, items) => sum + Object.values(items).reduce((s, q) => s + q, 0),
-    0,
-  )
+  const itemsByDate = analysis.itemsByDate || {}
+  const koksmenuByDate = analysis.koksmenuByDate || {}
+
+  const sumMap = (m) =>
+    Object.values(m).reduce(
+      (sum, items) => sum + Object.values(items).reduce((s, q) => s + q, 0),
+      0,
+    )
+  const totalItems = sumMap(itemsByDate) + sumMap(koksmenuByDate)
 
   const datesWithData = analysis.dates.filter(
-    (d) => Object.keys(analysis.itemsByDate[d] || {}).length > 0,
+    (d) =>
+      Object.keys(itemsByDate[d] || {}).length > 0 ||
+      Object.keys(koksmenuByDate[d] || {}).length > 0,
   )
 
   return {
@@ -226,7 +278,8 @@ function buildResult(filename, rows) {
     typeLabel: TYPE_LABELS[type],
     dates: analysis.dates,
     datesWithData,
-    itemsByDate: analysis.itemsByDate,
+    itemsByDate,
+    koksmenuByDate,
     totalItems,
   }
 }
@@ -258,17 +311,33 @@ export function parseCSVContent(filename, content) {
 
 const TURKISH_DIACRITICS = 'çÇğĞıİöÖşŞüÜ'
 
-function normalizeName(name) {
-  return name
+export function normalizeName(name) {
+  const words = name
     .toLocaleLowerCase('tr-TR')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ı/g, 'i')
-    .replace(/\s+/g, ' ')
+    // Treat any punctuation/separator as a word break so "Biber&Domates" and
+    // "Biber & Domates" collapse to the same key.
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+    .split(' ')
+    .filter(Boolean)
+
+  // Drop a trailing Turkish 3rd-person possessive suffix on the head noun so the
+  // package short forms group with the full menu names ("islim kebab" == "islim
+  // kebabı", "kayseri yaglamas(i)"). Applied to both sides, so exact matches stay
+  // matched; guarded by a min length so short words aren't mangled.
+  if (words.length > 0) {
+    const last = words.length - 1
+    const folded = words[last].replace(/s?[iu]$/, '')
+    if (folded.length >= 3) words[last] = folded
+  }
+
+  return words.join(' ')
 }
 
-function nameQuality(name) {
+export function nameQuality(name) {
   let score = 0
   for (const ch of name) {
     if (TURKISH_DIACRITICS.includes(ch)) score += 3
@@ -289,27 +358,3 @@ function nameQuality(name) {
   return score
 }
 
-export function aggregateForDates(files, selectedDates) {
-  const selected = new Set(selectedDates)
-  const groups = {}
-  for (const file of files) {
-    if (file.type === FILE_TYPES.UNKNOWN) continue
-    for (const [date, items] of Object.entries(file.itemsByDate || {})) {
-      if (!selected.has(date)) continue
-      for (const [name, qty] of Object.entries(items)) {
-        const key = normalizeName(name)
-        if (!groups[key]) {
-          groups[key] = { displayName: name, qty: 0 }
-        } else if (nameQuality(name) > nameQuality(groups[key].displayName)) {
-          groups[key].displayName = name
-        }
-        groups[key].qty += qty
-      }
-    }
-  }
-  const totals = {}
-  for (const { displayName, qty } of Object.values(groups)) {
-    totals[displayName] = qty
-  }
-  return totals
-}

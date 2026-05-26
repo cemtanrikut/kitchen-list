@@ -516,6 +516,21 @@ main.container {
   color: var(--color-text);
 }
 
+.btn-secondary {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-bg);
+  border-color: var(--color-text-muted);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.45;
+}
+
 .btn-icon {
   display: inline-flex;
   align-items: center;
@@ -717,6 +732,30 @@ main.container {
   color: var(--color-text-muted);
 }
 
+.analysis-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filename-input {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  width: 240px;
+  max-width: 100%;
+}
+
+.filename-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
 /* ─────────────────────────────────────────────────────────────────
  * Responsive
  * ───────────────────────────────────────────────────────────────── */
@@ -771,8 +810,16 @@ main.container {
     align-items: stretch;
   }
 
-  .analysis-footer .btn {
+  .analysis-actions {
     width: 100%;
+  }
+
+  .filename-input {
+    width: 100%;
+  }
+
+  .analysis-actions .btn {
+    flex: 1;
   }
 
   .analysis-summary {
