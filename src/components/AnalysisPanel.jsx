@@ -26,10 +26,13 @@ function AnalysisPanel({
   onToggleDate,
   onToggleAll,
   onClose,
-  onExport,
+  onExportCSV,
+  onExportXLSX,
   isExporting,
   itemCount,
   totalQty,
+  fileName,
+  onFileNameChange,
 }) {
   const allSelected =
     availableDates.length > 0 && selectedDates.length === availableDates.length
@@ -103,14 +106,33 @@ function AnalysisPanel({
             </>
           )}
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onExport}
-          disabled={!canExport || isExporting}
-        >
-          {isExporting ? 'Hazırlanıyor…' : 'Export CSV'}
-        </button>
+        <div className="analysis-actions">
+          <input
+            type="text"
+            className="filename-input"
+            value={fileName}
+            onChange={(e) => onFileNameChange(e.target.value)}
+            placeholder="dosya adı"
+            aria-label="Dosya adı"
+            title="Uzantı (.csv / .xlsx) otomatik eklenir"
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onExportCSV}
+            disabled={!canExport || isExporting}
+          >
+            {isExporting ? 'Hazırlanıyor…' : 'CSV indir'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onExportXLSX}
+            disabled={!canExport || isExporting}
+          >
+            {isExporting ? 'Hazırlanıyor…' : 'Excel indir'}
+          </button>
+        </div>
       </div>
     </div>
   )

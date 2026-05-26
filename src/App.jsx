@@ -4,9 +4,9 @@ import UploadZone from './components/UploadZone'
 import FileCard from './components/FileCard'
 import EmptyState from './components/EmptyState'
 import AnalysisPanel from './components/AnalysisPanel'
-import { parseCSVFile, aggregateForDates, FILE_TYPES } from './utils/parsers'
-import { buildTotalsCSV, downloadCSV } from './utils/csv'
-import { formatNumber } from './utils/format'
+import { parseCSVFile, FILE_TYPES } from './utils/parsers'
+import { buildKitchenList } from './utils/categories'
+import { buildKitchenListCSV, downloadCSV, downloadBlob } from './utils/csv'
 import './App.css'
 
 function App() {
@@ -16,6 +16,9 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [selectedDates, setSelectedDates] = useState([])
   const [isExporting, setIsExporting] = useState(false)
+  const [fileName, setFileName] = useState(
+    () => `mutfak-listesi-${new Date().toISOString().slice(0, 10)}`,
+  )
 
   const availableDates = useMemo(() => {
     const map = new Map()
@@ -31,16 +34,18 @@ function App() {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [files])
 
-  const aggregated = useMemo(() => {
-    if (selectedDates.length === 0) return {}
-    return aggregateForDates(files, selectedDates)
+  const kitchen = useMemo(() => {
+    if (selectedDates.length === 0) {
+      return {
+        dates: [],
+        categories: [],
+        dayTotals: {},
+        grandTotal: 0,
+        summary: { dishCount: 0, total: 0 },
+      }
+    }
+    return buildKitchenList(files, selectedDates)
   }, [files, selectedDates])
-
-  const aggregatedSummary = useMemo(() => {
-    const items = Object.entries(aggregated)
-    const total = items.reduce((s, [, q]) => s + q, 0)
-    return { itemCount: items.length, total }
-  }, [aggregated])
 
   const handleFilesAdded = async (incoming) => {
     setError(null)
@@ -137,16 +142,31 @@ function App() {
     }
   }
 
-  const handleExport = () => {
-    if (selectedDates.length === 0) return
-    if (aggregatedSummary.itemCount === 0) return
+  const handleExportCSV = () => {
+    if (kitchen.summary.dishCount === 0) return
     setIsExporting(true)
     try {
-      const csv = buildTotalsCSV(aggregated, selectedDates)
-      const stamp = new Date().toISOString().slice(0, 10)
-      downloadCSV(csv, `kitchen-list-${stamp}.csv`)
+      const csv = buildKitchenListCSV(kitchen)
+      const base = (fileName.trim() || 'mutfak-listesi').replace(/\.(csv|xlsx)$/i, '')
+      downloadCSV(csv, `${base}.csv`)
     } catch (err) {
       setError(`Dışa aktarma başarısız: ${err.message}`)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportXLSX = async () => {
+    if (kitchen.summary.dishCount === 0) return
+    setIsExporting(true)
+    try {
+      // exceljs is heavy; load it only when an Excel export is actually requested.
+      const { buildKitchenListXLSX } = await import('./utils/xlsx')
+      const blob = await buildKitchenListXLSX(kitchen)
+      const base = (fileName.trim() || 'mutfak-listesi').replace(/\.(csv|xlsx)$/i, '')
+      downloadBlob(blob, `${base}.xlsx`)
+    } catch (err) {
+      setError(`Excel dışa aktarma başarısız: ${err.message}`)
     } finally {
       setIsExporting(false)
     }
@@ -248,10 +268,13 @@ function App() {
                 onToggleDate={handleToggleDate}
                 onToggleAll={handleToggleAll}
                 onClose={handleCloseAnalysis}
-                onExport={handleExport}
+                onExportCSV={handleExportCSV}
+                onExportXLSX={handleExportXLSX}
                 isExporting={isExporting}
-                itemCount={aggregatedSummary.itemCount}
-                totalQty={aggregatedSummary.total}
+                itemCount={kitchen.summary.dishCount}
+                totalQty={kitchen.summary.total}
+                fileName={fileName}
+                onFileNameChange={setFileName}
               />
             )}
           </div>

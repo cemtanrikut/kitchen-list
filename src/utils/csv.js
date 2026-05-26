@@ -1,9 +1,7 @@
 import Papa from 'papaparse'
-import { isoToDisplay } from './dates'
+import { buildGrid } from './layout'
 
-export function downloadCSV(csvString, filename) {
-  const BOM = '﻿'
-  const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' })
+export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -14,18 +12,15 @@ export function downloadCSV(csvString, filename) {
   URL.revokeObjectURL(url)
 }
 
-export function buildTotalsCSV(totals, selectedDates = []) {
-  const dateLabel = [...selectedDates]
-    .sort()
-    .map(isoToDisplay)
-    .join(', ')
+export function downloadCSV(csvString, filename) {
+  const BOM = '﻿'
+  const blob = new Blob([BOM + csvString], { type: 'text/csv;charset=utf-8;' })
+  downloadBlob(blob, filename)
+}
 
-  const rows = Object.entries(totals)
-    .sort(([a], [b]) => a.localeCompare(b, 'tr'))
-    .map(([name, qty]) => [name, qty])
-
-  const headerCsv = Papa.unparse([['Tarih', dateLabel]])
-  const bodyCsv = Papa.unparse([['Yemek', 'Adet'], ...rows])
-
-  return `${headerCsv}\n\n${bodyCsv}`
+// The CSV mirrors the Excel layout: day blocks side by side with a gap column
+// between them. Colours are Excel-only; here the structure carries the meaning.
+export function buildKitchenListCSV(kitchen) {
+  const { grid } = buildGrid(kitchen)
+  return Papa.unparse(grid)
 }
