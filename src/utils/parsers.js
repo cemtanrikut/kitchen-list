@@ -140,14 +140,62 @@ function parseDailyCounts(filename, rows) {
   return { dates: [dateIso], itemsByDate, koksmenuByDate }
 }
 
+// The "Totalen koksmenu per leverdag" section lists how many chef's-box packages
+// were ordered per delivery day: "Koksmenu 5 dagen" / "Koksmenu 7 dagen". These are
+// package counts, not dishes. Return { [date]: { fiveDay, sevenDay } } for the days
+// that have any. categories.js explodes them into dishes via the box contents file.
+function parseKoksmenuPackages(rows, headerIdx, dates) {
+  const result = {}
+  if (headerIdx < 0) return result
+
+  const dayToColIdx = {}
+  const headerRow = rows[headerIdx]
+  for (let i = 1; i < headerRow.length; i++) {
+    const name = cell(headerRow, i)
+    if (DUTCH_DAYS.includes(name)) dayToColIdx[name] = i
+  }
+
+  let endIdx = rows.length
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    if (isRowEmpty(rows[i])) {
+      endIdx = i
+      break
+    }
+  }
+
+  const findRow = (needle) => {
+    for (let i = headerIdx + 1; i < endIdx; i++) {
+      if (cell(rows[i], 0).toLowerCase().includes(needle)) return rows[i]
+    }
+    return null
+  }
+  const fiveRow = findRow('5 dagen')
+  const sevenRow = findRow('7 dagen')
+  const readQty = (row, col) => {
+    if (!row || col == null) return 0
+    const n = parseInt(cell(row, col), 10)
+    return Number.isNaN(n) ? 0 : n
+  }
+
+  for (const date of dates) {
+    const col = dayToColIdx[isoToDutchDay(date)]
+    const fiveDay = readQty(fiveRow, col)
+    const sevenDay = readQty(sevenRow, col)
+    if (fiveDay > 0 || sevenDay > 0) result[date] = { fiveDay, sevenDay }
+  }
+  return result
+}
+
 function parseKitchenOverview(filename, rows) {
   const m = filename.match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/)
-  if (!m) return { dates: [], itemsByDate: {}, koksmenuByDate: {} }
+  if (!m) {
+    return { dates: [], itemsByDate: {}, koksmenuByDate: {}, koksmenuPackagesByDate: {} }
+  }
 
   const startIso = m[1]
   const endIso = m[2]
   if (!isValidIso(startIso) || !isValidIso(endIso)) {
-    return { dates: [], itemsByDate: {}, koksmenuByDate: {} }
+    return { dates: [], itemsByDate: {}, koksmenuByDate: {}, koksmenuPackagesByDate: {} }
   }
 
   const dates = dateRange(startIso, endIso)
@@ -159,17 +207,25 @@ function parseKitchenOverview(filename, rows) {
   }
 
   const sectionStarts = []
+  let koksmenuHeaderIdx = -1
   for (let i = 0; i < rows.length; i++) {
     if (cell(rows[i], 0) === 'Gerechtnaam') {
       let titleIdx = i - 1
       while (titleIdx >= 0 && isRowEmpty(rows[titleIdx])) titleIdx--
       const title = cell(rows[titleIdx], 0).toLowerCase()
-      if (title.includes('koksmenu')) continue
+      if (title.includes('koksmenu')) {
+        koksmenuHeaderIdx = i
+        continue
+      }
       sectionStarts.push(i)
     }
   }
 
-  if (sectionStarts.length === 0) return { dates, itemsByDate, koksmenuByDate }
+  const koksmenuPackagesByDate = parseKoksmenuPackages(rows, koksmenuHeaderIdx, dates)
+
+  if (sectionStarts.length === 0) {
+    return { dates, itemsByDate, koksmenuByDate, koksmenuPackagesByDate }
+  }
 
   const headerRow = rows[sectionStarts[0]]
   const dayToColIdx = {}
@@ -204,7 +260,7 @@ function parseKitchenOverview(filename, rows) {
     }
   }
 
-  return { dates, itemsByDate, koksmenuByDate }
+  return { dates, itemsByDate, koksmenuByDate, koksmenuPackagesByDate }
 }
 
 function parseKitchenListReport(filename, rows) {
@@ -280,6 +336,7 @@ function buildResult(filename, rows) {
     datesWithData,
     itemsByDate,
     koksmenuByDate,
+    koksmenuPackagesByDate: analysis.koksmenuPackagesByDate || {},
     totalItems,
   }
 }

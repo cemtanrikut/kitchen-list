@@ -568,6 +568,116 @@ main.container {
   border-color: var(--color-error-border);
 }
 
+.alert-info {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-active);
+  border-color: var(--color-primary-border);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Koksmenu (chef's box) contents card
+ * ───────────────────────────────────────────────────────────────── */
+
+.koksmenu-card {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.koksmenu-card.is-stale {
+  border-color: var(--color-warn-border);
+  background: var(--color-warn-bg);
+}
+
+.koksmenu-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.koksmenu-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.koksmenu-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.koksmenu-badge {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+}
+
+.koksmenu-file {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.koksmenu-card-meta {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.koksmenu-preview {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.koksmenu-col-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.koksmenu-col-title span {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.koksmenu-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.koksmenu-notice {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.koksmenu-notice.is-stale {
+  color: var(--color-warn);
+  font-weight: 500;
+}
+
 /* ─────────────────────────────────────────────────────────────────
  * Export bar
  * ───────────────────────────────────────────────────────────────── */
@@ -816,6 +926,10 @@ main.container {
 
   .filename-input {
     width: 100%;
+  }
+
+  .koksmenu-preview {
+    grid-template-columns: 1fr;
   }
 
   .analysis-actions .btn {

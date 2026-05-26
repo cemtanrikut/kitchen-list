@@ -75,12 +75,12 @@ function UploadZone({ onFilesAdded, compact = false }) {
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={0}
-      aria-label="CSV dosyalarını yükle"
+      aria-label="CSV veya Excel dosyalarını yükle"
     >
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         multiple
         onChange={handleChange}
         style={{ display: 'none' }}
@@ -92,7 +92,9 @@ function UploadZone({ onFilesAdded, compact = false }) {
 
       <div className="upload-zone-text">
         <p className="upload-zone-title">
-          {compact ? 'Daha fazla CSV ekle' : 'CSV dosyalarını buraya sürükleyin'}
+          {compact
+            ? 'Daha fazla dosya ekle'
+            : 'CSV veya Excel dosyalarını buraya sürükleyin'}
         </p>
         {!compact && (
           <p className="upload-zone-hint">
@@ -103,7 +105,7 @@ function UploadZone({ onFilesAdded, compact = false }) {
 
       {!compact && (
         <p className="upload-zone-meta">
-          Birden fazla dosya seçebilirsiniz · Yalnızca .csv
+          Sipariş CSV'leri · Şefin Kutusu içeriği için .xlsx
         </p>
       )}
     </div>
