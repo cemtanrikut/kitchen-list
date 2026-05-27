@@ -4,9 +4,16 @@ import UploadZone from './components/UploadZone'
 import FileCard from './components/FileCard'
 import EmptyState from './components/EmptyState'
 import AnalysisPanel from './components/AnalysisPanel'
+import KoksmenuCard from './components/KoksmenuCard'
 import { parseCSVFile, FILE_TYPES } from './utils/parsers'
 import { buildKitchenList } from './utils/categories'
 import { buildKitchenListCSV, downloadCSV, downloadBlob } from './utils/csv'
+import { isXlsx, parseMenuListExport } from './utils/menuListExport'
+import {
+  loadKoksmenuContents,
+  saveKoksmenuContents,
+  clearKoksmenuContents,
+} from './utils/koksmenuStore'
 import './App.css'
 
 function App() {
@@ -19,6 +26,7 @@ function App() {
   const [fileName, setFileName] = useState(
     () => `mutfak-listesi-${new Date().toISOString().slice(0, 10)}`,
   )
+  const [koksmenu, setKoksmenu] = useState(() => loadKoksmenuContents())
 
   const availableDates = useMemo(() => {
     const map = new Map()
@@ -44,8 +52,8 @@ function App() {
         summary: { dishCount: 0, total: 0 },
       }
     }
-    return buildKitchenList(files, selectedDates)
-  }, [files, selectedDates])
+    return buildKitchenList(files, selectedDates, koksmenu)
+  }, [files, selectedDates, koksmenu])
 
   const handleFilesAdded = async (incoming) => {
     setError(null)
@@ -54,15 +62,27 @@ function App() {
     const accepted = []
     const errors = []
     const unknown = []
+    let nextKoksmenu = null
 
     for (const file of incoming) {
+      // Chef's-box contents (.xlsx) — persisted in localStorage, reused across the
+      // week. Not added as a transient file card.
+      if (isXlsx(file)) {
+        try {
+          nextKoksmenu = await parseMenuListExport(file)
+        } catch (err) {
+          errors.push(`"${file.name}" Şefin Kutusu dosyası okunamadı: ${err.message}`)
+        }
+        continue
+      }
+
       const isCSV =
         file.name.toLowerCase().endsWith('.csv') ||
         file.type === 'text/csv' ||
         file.type === 'application/vnd.ms-excel'
 
       if (!isCSV) {
-        errors.push(`"${file.name}" CSV dosyası değil`)
+        errors.push(`"${file.name}" CSV veya Excel dosyası değil`)
         continue
       }
 
@@ -91,6 +111,11 @@ function App() {
       setFiles((prev) => [...prev, ...accepted])
     }
 
+    if (nextKoksmenu) {
+      saveKoksmenuContents(nextKoksmenu)
+      setKoksmenu(nextKoksmenu)
+    }
+
     const messages = []
     if (errors.length > 0) messages.push(errors.join(' · '))
     if (unknown.length > 0) {
@@ -115,6 +140,11 @@ function App() {
     setError(null)
     setIsAnalyzing(false)
     setSelectedDates([])
+  }
+
+  const handleRemoveKoksmenu = () => {
+    clearKoksmenuContents()
+    setKoksmenu(null)
   }
 
   const handleAnalyze = () => {
@@ -177,6 +207,11 @@ function App() {
     (f) => f.type !== FILE_TYPES.UNKNOWN,
   ).length
   const canAnalyze = analyzableCount > 0 && availableDates.length > 0
+  const needsKoksmenuFile =
+    !koksmenu &&
+    files.some(
+      (f) => Object.keys(f.koksmenuPackagesByDate || {}).length > 0,
+    )
 
   return (
     <div className="app">
@@ -185,6 +220,19 @@ function App() {
       <main className="container">
         <section className="upload-section">
           <UploadZone onFilesAdded={handleFilesAdded} compact={hasFiles} />
+          {koksmenu && (
+            <KoksmenuCard
+              contents={koksmenu}
+              onRemove={handleRemoveKoksmenu}
+            />
+          )}
+          {needsKoksmenuFile && (
+            <div className="alert alert-info" role="status">
+              Koksmenu paketleri bulundu ama Şefin Kutusu içerik dosyası yüklü
+              değil. Paketlerin yemeklere dağılması için .xlsx içerik dosyasını
+              yükleyin.
+            </div>
+          )}
           {isProcessing && (
             <div className="status-line">Dosyalar işleniyor…</div>
           )}

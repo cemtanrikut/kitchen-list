@@ -23,6 +23,9 @@
   --color-error-border: #fecaca;
   --color-success: #047857;
   --color-success-bg: #ecfdf5;
+  --color-warn: #b45309;
+  --color-warn-bg: #fffbeb;
+  --color-warn-border: #fde68a;
 
   /* Shape */
   --radius-sm: 4px;
