@@ -640,7 +640,7 @@ main.container {
 .koksmenu-preview {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 16px;
 }
 

@@ -55,6 +55,7 @@ function KoksmenuCard({ contents, onRemove }) {
   const stale = days >= STALE_DAYS
   const ago = days === 0 ? 'bugün' : `${days} gün önce`
   const five = contents.fiveDay || []
+  const six = contents.sixDay || []
   const seven = contents.sevenDay || []
 
   return (
@@ -89,7 +90,8 @@ function KoksmenuCard({ contents, onRemove }) {
       </div>
 
       <div className="koksmenu-card-meta">
-        5 Günlük: {five.length} yemek · 7 Günlük: {seven.length} yemek
+        5 Günlük: {five.length} · 6 Günlük: {six.length} · 7 Günlük:{' '}
+        {seven.length} yemek
       </div>
 
       {isOpen && (
@@ -100,6 +102,16 @@ function KoksmenuCard({ contents, onRemove }) {
             </div>
             <ol className="koksmenu-list">
               {five.map((dish) => (
+                <li key={dish}>{dish}</li>
+              ))}
+            </ol>
+          </div>
+          <div className="koksmenu-col">
+            <div className="koksmenu-col-title">
+              6 Günlük <span>({six.length})</span>
+            </div>
+            <ol className="koksmenu-list">
+              {six.map((dish) => (
                 <li key={dish}>{dish}</li>
               ))}
             </ol>

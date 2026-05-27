@@ -159,23 +159,29 @@ export function buildKitchenList(files, selectedDates, koksmenuContents = null) 
   // Explode chef's-box (koksmenu) packages into dishes. Box order counts come from
   // the overview's koksmenuPackagesByDate; the box contents come from the persisted
   // Menu_list_export file. Each dish in a box = (box days) × (boxes ordered that
-  // day): 5-day dishes ×5, 7-day dishes ×7. Added to each dish's normal category.
+  // day): 5-day dishes ×5, 6-day dishes ×6, 7-day dishes ×7. Added to each dish's
+  // normal category.
   if (koksmenuContents) {
     const packagesByDate = {}
     for (const file of files) {
       for (const [date, counts] of Object.entries(file.koksmenuPackagesByDate || {})) {
         if (!selectedSet.has(date)) continue
-        const acc = packagesByDate[date] || { fiveDay: 0, sevenDay: 0 }
+        const acc = packagesByDate[date] || { fiveDay: 0, sixDay: 0, sevenDay: 0 }
         acc.fiveDay += counts.fiveDay || 0
+        acc.sixDay += counts.sixDay || 0
         acc.sevenDay += counts.sevenDay || 0
         packagesByDate[date] = acc
       }
     }
     for (const [date, counts] of Object.entries(packagesByDate)) {
       const fiveQty = 5 * counts.fiveDay
+      const sixQty = 6 * counts.sixDay
       const sevenQty = 7 * counts.sevenDay
       if (fiveQty > 0) {
         for (const dish of koksmenuContents.fiveDay || []) addByTemplate(date, dish, fiveQty)
+      }
+      if (sixQty > 0) {
+        for (const dish of koksmenuContents.sixDay || []) addByTemplate(date, dish, sixQty)
       }
       if (sevenQty > 0) {
         for (const dish of koksmenuContents.sevenDay || []) addByTemplate(date, dish, sevenQty)

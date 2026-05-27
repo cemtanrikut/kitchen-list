@@ -141,9 +141,10 @@ function parseDailyCounts(filename, rows) {
 }
 
 // The "Totalen koksmenu per leverdag" section lists how many chef's-box packages
-// were ordered per delivery day: "Koksmenu 5 dagen" / "Koksmenu 7 dagen". These are
-// package counts, not dishes. Return { [date]: { fiveDay, sevenDay } } for the days
-// that have any. categories.js explodes them into dishes via the box contents file.
+// were ordered per delivery day: "Koksmenu 5 dagen" / "Koksmenu 6 dagen" /
+// "Koksmenu 7 dagen". These are package counts, not dishes. Return
+// { [date]: { fiveDay, sixDay, sevenDay } } for the days that have any.
+// categories.js explodes them into dishes via the box contents file.
 function parseKoksmenuPackages(rows, headerIdx, dates) {
   const result = {}
   if (headerIdx < 0) return result
@@ -170,6 +171,7 @@ function parseKoksmenuPackages(rows, headerIdx, dates) {
     return null
   }
   const fiveRow = findRow('5 dagen')
+  const sixRow = findRow('6 dagen')
   const sevenRow = findRow('7 dagen')
   const readQty = (row, col) => {
     if (!row || col == null) return 0
@@ -180,8 +182,11 @@ function parseKoksmenuPackages(rows, headerIdx, dates) {
   for (const date of dates) {
     const col = dayToColIdx[isoToDutchDay(date)]
     const fiveDay = readQty(fiveRow, col)
+    const sixDay = readQty(sixRow, col)
     const sevenDay = readQty(sevenRow, col)
-    if (fiveDay > 0 || sevenDay > 0) result[date] = { fiveDay, sevenDay }
+    if (fiveDay > 0 || sixDay > 0 || sevenDay > 0) {
+      result[date] = { fiveDay, sixDay, sevenDay }
+    }
   }
   return result
 }
