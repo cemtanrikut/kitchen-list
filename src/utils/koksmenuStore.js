@@ -8,7 +8,11 @@ export function loadKoksmenuContents() {
     const raw = localStorage.getItem(KEY)
     if (!raw) return null
     const data = JSON.parse(raw)
-    if (!data || (!data.fiveDay?.length && !data.sevenDay?.length)) return null
+    if (
+      !data ||
+      (!data.fiveDay?.length && !data.sixDay?.length && !data.sevenDay?.length)
+    )
+      return null
     return data
   } catch {
     return null
