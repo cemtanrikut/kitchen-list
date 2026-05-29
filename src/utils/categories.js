@@ -19,15 +19,25 @@ const TEMPLATE = [
       'Etli Nohut Yemeği',
       'Etli Kuru Fasulye',
       'Sulu Köfte',
+      'Patlıcan Yemeği',
     ],
   ],
   ['IZGARA ET', ['Adana Kebab', 'Köfte', 'Patlıcan Kebabı']],
-  ['IZGARA TAVUK', ['Fırında Tavuk', 'Tavuk Şiş', 'Tavuk Kanat']],
+  ['IZGARA TAVUK', ['Fırında Tavuk', 'Tavuk Şiş', 'Tavuk Kanat', 'Tavuk But']],
   [
     'TAVUKLU YEMEKLER',
-    ['Tavuk Sultan', 'Tavuklu Mantar Sote', 'Tavuklu Turlu', 'Tavuk Haşlama'],
+    [
+      'Tavuk Sultan',
+      'Tavuklu Mantar Sote',
+      'Tavuklu Turlu',
+      'Tavuk Haşlama',
+      'Köri Soslu Tavuk',
+    ],
   ],
-  ['ETLI YEMEKLER', ['Biber Dolma', 'Spagetti Bolognese', 'Musakka', 'Karnıyarık']],
+  [
+    'ETLI YEMEKLER',
+    ['Biber Dolma', 'Spagetti Bolognese', 'Musakka', 'Karnıyarık', 'Antep Tava'],
+  ],
   ['Premium paket', ['Kayseri Yağlaması']],
   [
     'GARNITUR',
@@ -115,6 +125,25 @@ export function buildKitchenList(files, selectedDates, koksmenuContents = null) 
   const catMap = new Map()
   const dayTotals = {}
 
+  // Dishes that appear in the chef's-box contents file, keyed by normalized name
+  // (value = the box's own spelling). Per the customer's request, any dish that
+  // would otherwise fall into "Diğer" but exists in the box is listed under
+  // KOKSMENU instead. Dishes that match an à la carte template keep their normal
+  // home — only the would-be-"Diğer" ones are rerouted.
+  const boxDishes = new Map()
+  if (koksmenuContents) {
+    for (const list of [
+      koksmenuContents.fiveDay,
+      koksmenuContents.sixDay,
+      koksmenuContents.sevenDay,
+    ]) {
+      for (const dish of list || []) {
+        const norm = normalizeName(dish)
+        if (!boxDishes.has(norm)) boxDishes.set(norm, dish)
+      }
+    }
+  }
+
   // Route a dish by its template category (à la carte placement), merging by name.
   const addByTemplate = (date, name, qty) => {
     const norm = normalizeName(name)
@@ -123,6 +152,12 @@ export function buildKitchenList(files, selectedDates, koksmenuContents = null) 
       addPortion(catMap, dayTotals, date, match.category, norm, match.canonical, qty, {
         canonical: true,
         rank: match.rank,
+      })
+    } else if (boxDishes.has(norm)) {
+      // Box dish with no à la carte home — show it under KOKSMENU with the box's
+      // spelling, which (being canonical) also wins over any misspelled variant.
+      addPortion(catMap, dayTotals, date, KOKSMENU_CATEGORY, norm, boxDishes.get(norm), qty, {
+        canonical: true,
       })
     } else {
       addPortion(catMap, dayTotals, date, OTHER_CATEGORY, norm, name, qty)

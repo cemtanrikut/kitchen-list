@@ -41,6 +41,11 @@ function isRowEmpty(row) {
 
 const KOKSMENU_PREFIX = /^\s*koksmenu\s*\/\s*/i
 
+// Source systems (apicbase) emit sentinel rows wrapped in double underscores —
+// e.g. "__NO_MEAL__" for an order line with no meal chosen. These are not dishes
+// and must never reach a category or the totals.
+const PLACEHOLDER_NAME = /^__.*__$/
+
 // Title-case a SHOUTING package label: "TAVUK SULTAN" -> "Tavuk Sultan",
 // "KOZLENMIS BIBER&DOMATES" -> "Kozlenmis Biber&Domates". Uses en-US casing on
 // purpose — these labels are plain ASCII, so we avoid the Turkish I/İ rules that
@@ -60,6 +65,9 @@ function toTitleCase(name) {
 // "KOKSMENU /" prefix never surfaces. classify() reports whether a raw cell is a
 // package item and returns the cleaned dish name either way.
 function classify(raw) {
+  if (PLACEHOLDER_NAME.test(raw.trim())) {
+    return { koksmenu: false, name: '' }
+  }
   if (KOKSMENU_PREFIX.test(raw)) {
     return {
       koksmenu: true,
@@ -373,18 +381,32 @@ export function parseCSVContent(filename, content) {
 
 const TURKISH_DIACRITICS = 'çÇğĞıİöÖşŞüÜ'
 
+// Recurring source-data misspellings, keyed by normalized word. Folded into the
+// canonical spelling so the same dish never splits into two rows. "Arabaşı" (a
+// soup) is frequently typed "Aribaşı".
+const WORD_ALIASES = { aribasi: 'arabasi' }
+
+// Whole-name variants that mean the same dish but can't be folded word-by-word
+// (here "tavuk" alone must stay distinct from "tavuklu"). Keyed by the fully
+// normalized name. "TAVUK TURLU" is the same dish as "Tavuklu Turlu".
+const PHRASE_ALIASES = { 'tavuk turl': 'tavuklu turl' }
+
 export function normalizeName(name) {
   const words = name
     .toLocaleLowerCase('tr-TR')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ı/g, 'i')
-    // Treat any punctuation/separator as a word break so "Biber&Domates" and
-    // "Biber & Domates" collapse to the same key.
+    // Drop apostrophes so a suffix attached with one stays part of its word
+    // ("Loris'in" -> "lorisin"), matching the un-apostrophed template name.
+    .replace(/['’‘´`]/g, '')
+    // Treat any other punctuation/separator as a word break so "Biber&Domates"
+    // and "Biber & Domates" collapse to the same key.
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
     .split(' ')
     .filter(Boolean)
+    .map((w) => WORD_ALIASES[w] || w)
 
   // Drop a trailing Turkish 3rd-person possessive suffix on the head noun so the
   // package short forms group with the full menu names ("islim kebab" == "islim
@@ -396,7 +418,8 @@ export function normalizeName(name) {
     if (folded.length >= 3) words[last] = folded
   }
 
-  return words.join(' ')
+  const key = words.join(' ')
+  return PHRASE_ALIASES[key] || key
 }
 
 export function nameQuality(name) {
