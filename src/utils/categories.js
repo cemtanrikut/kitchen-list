@@ -257,3 +257,32 @@ export function buildKitchenList(files, selectedDates, koksmenuContents = null) 
     summary: { dishCount, total: grandTotal },
   }
 }
+
+// Collapse a multi-day kitchen list into a single synthetic day. Every dish's
+// quantity becomes its total across all selected days, and the chosen date is
+// the only column. Used by the "single day" export, where the user wants the
+// whole selection summed up as if everything were cooked on one day. The result
+// has the same shape as buildKitchenList, so it flows through the same
+// CSV/Excel layout untouched.
+export function mergeKitchenToSingleDay(kitchen, dateIso) {
+  const categories = kitchen.categories
+    .map((cat) => ({
+      name: cat.name,
+      dishes: cat.dishes
+        .filter((d) => d.total > 0)
+        .map((d) => ({
+          display: d.display,
+          perDate: { [dateIso]: d.total },
+          total: d.total,
+        })),
+    }))
+    .filter((c) => c.dishes.length > 0)
+
+  return {
+    dates: [dateIso],
+    categories,
+    dayTotals: { [dateIso]: kitchen.grandTotal },
+    grandTotal: kitchen.grandTotal,
+    summary: kitchen.summary,
+  }
+}

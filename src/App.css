@@ -866,6 +866,27 @@ main.container {
   border-color: var(--color-primary);
 }
 
+.merge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.merge-date {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  width: 130px;
+}
+
+.merge-date:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
 /* ─────────────────────────────────────────────────────────────────
  * Responsive
  * ───────────────────────────────────────────────────────────────── */
@@ -933,6 +954,14 @@ main.container {
   }
 
   .analysis-actions .btn {
+    flex: 1;
+  }
+
+  .merge-group {
+    width: 100%;
+  }
+
+  .merge-date {
     flex: 1;
   }
 

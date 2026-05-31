@@ -1,4 +1,10 @@
-import { isoToDisplay, isoToTrDay } from '../utils/dates'
+import { useEffect, useState } from 'react'
+import {
+  isoToDisplay,
+  isoToTrDay,
+  isoToDdmmyyyy,
+  ddmmyyyyToIso,
+} from '../utils/dates'
 import { formatNumber } from '../utils/format'
 
 function CloseIcon() {
@@ -28,16 +34,33 @@ function AnalysisPanel({
   onClose,
   onExportCSV,
   onExportXLSX,
+  onExportMergedXLSX,
   isExporting,
   itemCount,
   totalQty,
   fileName,
   onFileNameChange,
+  mergeDate,
+  onMergeDateChange,
 }) {
   const allSelected =
     availableDates.length > 0 && selectedDates.length === availableDates.length
 
   const canExport = selectedDates.length > 0 && itemCount > 0
+
+  // The date field is edited as gg/aa/yyyy text but stored as ISO upstream.
+  const [mergeText, setMergeText] = useState(() => isoToDdmmyyyy(mergeDate))
+
+  useEffect(() => {
+    setMergeText(isoToDdmmyyyy(mergeDate))
+  }, [mergeDate])
+
+  const handleMergeTextChange = (e) => {
+    const raw = e.target.value
+    setMergeText(raw)
+    const iso = ddmmyyyyToIso(raw)
+    if (iso) onMergeDateChange(iso)
+  }
 
   return (
     <div className="analysis-panel">
@@ -132,6 +155,27 @@ function AnalysisPanel({
           >
             {isExporting ? 'Hazırlanıyor…' : 'Excel indir'}
           </button>
+          <span className="merge-group">
+            <input
+              type="text"
+              className="merge-date"
+              value={mergeText}
+              onChange={handleMergeTextChange}
+              placeholder="gg/aa/yyyy"
+              inputMode="numeric"
+              aria-label="Tek gün tarihi (gg/aa/yyyy)"
+              title="Tüm seçili günlerin toplamı bu tarih altında tek gün olarak indirilir"
+            />
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onExportMergedXLSX}
+              disabled={!canExport || isExporting}
+              title="Seçili günlerin tümünü, seçtiğiniz tarih altında tek bir gün olarak toplar"
+            >
+              {isExporting ? 'Hazırlanıyor…' : 'Tek gün Excel'}
+            </button>
+          </span>
         </div>
       </div>
     </div>
