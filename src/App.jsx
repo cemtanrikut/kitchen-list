@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Header from './components/Header'
 import UploadZone from './components/UploadZone'
 import FileCard from './components/FileCard'
@@ -6,7 +6,7 @@ import EmptyState from './components/EmptyState'
 import AnalysisPanel from './components/AnalysisPanel'
 import KoksmenuCard from './components/KoksmenuCard'
 import { parseCSVFile, FILE_TYPES } from './utils/parsers'
-import { buildKitchenList } from './utils/categories'
+import { buildKitchenList, mergeKitchenToSingleDay } from './utils/categories'
 import { buildKitchenListCSV, downloadCSV, downloadBlob } from './utils/csv'
 import { isXlsx, parseMenuListExport } from './utils/menuListExport'
 import {
@@ -27,6 +27,9 @@ function App() {
     () => `mutfak-listesi-${new Date().toISOString().slice(0, 10)}`,
   )
   const [koksmenu, setKoksmenu] = useState(() => loadKoksmenuContents())
+  const [mergeDate, setMergeDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  )
 
   const availableDates = useMemo(() => {
     const map = new Map()
@@ -54,6 +57,14 @@ function App() {
     }
     return buildKitchenList(files, selectedDates, koksmenu)
   }, [files, selectedDates, koksmenu])
+
+  // The single-day export defaults its date to the earliest selected day, and
+  // re-syncs whenever the selection changes.
+  useEffect(() => {
+    if (selectedDates.length > 0) {
+      setMergeDate([...selectedDates].sort()[0])
+    }
+  }, [selectedDates])
 
   const handleFilesAdded = async (incoming) => {
     setError(null)
@@ -202,6 +213,25 @@ function App() {
     }
   }
 
+  // Single-day export: same data, but every selected day is summed into one day
+  // labelled with the date the user picks.
+  const handleExportMergedXLSX = async () => {
+    if (kitchen.summary.dishCount === 0) return
+    setIsExporting(true)
+    try {
+      const { buildKitchenListXLSX } = await import('./utils/xlsx')
+      const dateIso = mergeDate || new Date().toISOString().slice(0, 10)
+      const merged = mergeKitchenToSingleDay(kitchen, dateIso)
+      const blob = await buildKitchenListXLSX(merged)
+      const base = (fileName.trim() || 'mutfak-listesi').replace(/\.(csv|xlsx)$/i, '')
+      downloadBlob(blob, `${base}.xlsx`)
+    } catch (err) {
+      setError(`Excel dışa aktarma başarısız: ${err.message}`)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const hasFiles = files.length > 0
   const analyzableCount = files.filter(
     (f) => f.type !== FILE_TYPES.UNKNOWN,
@@ -318,11 +348,14 @@ function App() {
                 onClose={handleCloseAnalysis}
                 onExportCSV={handleExportCSV}
                 onExportXLSX={handleExportXLSX}
+                onExportMergedXLSX={handleExportMergedXLSX}
                 isExporting={isExporting}
                 itemCount={kitchen.summary.dishCount}
                 totalQty={kitchen.summary.total}
                 fileName={fileName}
                 onFileNameChange={setFileName}
+                mergeDate={mergeDate}
+                onMergeDateChange={setMergeDate}
               />
             )}
           </div>

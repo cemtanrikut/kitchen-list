@@ -36,6 +36,13 @@ export function isoToDisplay(iso) {
   return `${d}-${m}-${y}`
 }
 
+export function isoToDdmmyyyy(iso) {
+  if (!iso) return ''
+  const [y, m, d] = iso.split('-')
+  if (!y || !m || !d) return ''
+  return `${d}/${m}/${y}`
+}
+
 export function ddmmyyyyToIso(value) {
   if (!value || typeof value !== 'string') return null
   const parts = value.trim().split(/[.\-/]/)
