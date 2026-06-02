@@ -1,9 +1,13 @@
 import { normalizeName, nameQuality, FILE_TYPES } from './parsers'
 
 // Fixed kitchen-list template, derived from the chef's manual "Keukenlijst" sheet.
-// Each à la carte dish has a home category; the two package sections
-// ("KOKSMENU - GARNITUR" + "KOKSMENU - ANA YEMEK") are merged into one KOKSMENU
-// category. The order here is the order dishes appear in the export.
+// Each à la carte dish has a home category; the order here is the order dishes
+// appear in the export. The KOKSMENU category is intentionally left empty here and
+// is filled dynamically from the uploaded chef's-box contents (the weekly box file)
+// — see boxDishes in buildKitchenList. That way it always reflects the dishes
+// actually in this week's box. An à la carte order for a dish that is NOT in the box
+// (e.g. a one-off "Borsch soup") falls through to "Diğer" instead of being forced
+// under KOKSMENU by a stale hard-coded list.
 export const KOKSMENU_CATEGORY = 'KOKSMENU'
 export const OTHER_CATEGORY = 'Diğer'
 
@@ -19,6 +23,7 @@ const TEMPLATE = [
       'Etli Nohut Yemeği',
       'Etli Kuru Fasulye',
       'Sulu Köfte',
+      'Dalyan Köfte',
       'Patlıcan Yemeği',
     ],
   ],
@@ -32,6 +37,7 @@ const TEMPLATE = [
       'Tavuklu Turlu',
       'Tavuk Haşlama',
       'Köri Soslu Tavuk',
+      'Barbekü Soslu Tavuk',
     ],
   ],
   [
@@ -45,6 +51,7 @@ const TEMPLATE = [
       'Karnıbahar Kızartması',
       'Penne',
       'Spagetti Naturel',
+      'Spaghetti Aglio e Olio',
       'Fırınlanmış Sebzeler',
       'Mercimek Çorbası',
       'Mantar Sote',
@@ -54,24 +61,13 @@ const TEMPLATE = [
       'Sebzeli Tavuk Çorbası',
       'Yayla Çorbası',
       'Ezogelin Çorbası',
-    ],
-  ],
-  [
-    KOKSMENU_CATEGORY,
-    [
-      'Tricolore Makarna',
-      'Peynirli Pogaca',
-      'Kuskus',
+      'Domates Çorbası',
       'Borsch soup',
-      'Közlenmiş Biber & Domates',
-      'Tarhana Çorbası',
-      'Cheddar Soslu Patates',
-      'Citir Tavuk',
-      'Sebzeli Sulu Kofte',
-      'İslim Kebabı',
-      'Lorisin Köfte Gezegenleri',
     ],
   ],
+  // Dynamic: members come from the uploaded box contents (boxDishes), not a fixed
+  // list. Kept here only to hold its place in the category order.
+  [KOKSMENU_CATEGORY, []],
   ['BALIK', ['Levrek', 'Somon']],
   [
     'VEGAN',
@@ -191,11 +187,13 @@ export function buildKitchenList(files, selectedDates, koksmenuContents = null) 
     }
   }
 
-  // Explode chef's-box (koksmenu) packages into dishes. Box order counts come from
-  // the overview's koksmenuPackagesByDate; the box contents come from the persisted
-  // Menu_list_export file. Each dish in a box = (box days) × (boxes ordered that
-  // day): 5-day dishes ×5, 6-day dishes ×6, 7-day dishes ×7. Added to each dish's
-  // normal category.
+  // Explode chef's-box (koksmenu) packages into dishes. koksmenuPackagesByDate holds,
+  // per delivery day, the number of PEOPLE on a CHEF box of each size (counted from
+  // the raw orders); the box contents (which dishes) come from the persisted
+  // Menu_list_export file. Each box dish is made once per person on the box — the box
+  // size (5 / 6 / 7) is just the box type, NOT a per-dish multiplier. Added to each
+  // dish's normal category, on the delivery day. À la carte orders of the same dish
+  // are counted separately (above) and stack on top.
   if (koksmenuContents) {
     const packagesByDate = {}
     for (const file of files) {
@@ -209,17 +207,14 @@ export function buildKitchenList(files, selectedDates, koksmenuContents = null) 
       }
     }
     for (const [date, counts] of Object.entries(packagesByDate)) {
-      const fiveQty = 5 * counts.fiveDay
-      const sixQty = 6 * counts.sixDay
-      const sevenQty = 7 * counts.sevenDay
-      if (fiveQty > 0) {
-        for (const dish of koksmenuContents.fiveDay || []) addByTemplate(date, dish, fiveQty)
+      if (counts.fiveDay > 0) {
+        for (const dish of koksmenuContents.fiveDay || []) addByTemplate(date, dish, counts.fiveDay)
       }
-      if (sixQty > 0) {
-        for (const dish of koksmenuContents.sixDay || []) addByTemplate(date, dish, sixQty)
+      if (counts.sixDay > 0) {
+        for (const dish of koksmenuContents.sixDay || []) addByTemplate(date, dish, counts.sixDay)
       }
-      if (sevenQty > 0) {
-        for (const dish of koksmenuContents.sevenDay || []) addByTemplate(date, dish, sevenQty)
+      if (counts.sevenDay > 0) {
+        for (const dish of koksmenuContents.sevenDay || []) addByTemplate(date, dish, counts.sevenDay)
       }
     }
   }

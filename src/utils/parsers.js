@@ -148,53 +148,60 @@ function parseDailyCounts(filename, rows) {
   return { dates: [dateIso], itemsByDate, koksmenuByDate }
 }
 
-// The "Totalen koksmenu per leverdag" section lists how many chef's-box packages
-// were ordered per delivery day: "Koksmenu 5 dagen" / "Koksmenu 6 dagen" /
-// "Koksmenu 7 dagen". These are package counts, not dishes. Return
-// { [date]: { fiveDay, sixDay, sevenDay } } for the days that have any.
-// categories.js explodes them into dishes via the box contents file.
-function parseKoksmenuPackages(rows, headerIdx, dates) {
-  const result = {}
-  if (headerIdx < 0) return result
+// Chef's-box order counts, read straight from the raw per-order rows at the top of
+// the kitchen-overview export (the rows with "Type menu" = CHEF). This is the
+// reliable source: the "Totalen koksmenu per leverdag" summary further down has been
+// seen to over-count the boxes. Returns { [Bezorgdatum]: { fiveDay, sixDay, sevenDay } }
+// where each value is the number of PEOPLE on a CHEF box of that size (5 / 6 / 7 days)
+// for that delivery day — Σ "Aantal personen", counted once per distinct "Order id".
+// categories.js turns these into dishes: a box dish is served on every day of the
+// box, so each dish is needed (people × box-days) times.
+function parseKoksmenuOrders(rows, dates) {
+  const want = new Set(dates)
 
-  const dayToColIdx = {}
-  const headerRow = rows[headerIdx]
-  for (let i = 1; i < headerRow.length; i++) {
-    const name = cell(headerRow, i)
-    if (DUTCH_DAYS.includes(name)) dayToColIdx[name] = i
-  }
-
-  let endIdx = rows.length
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    if (isRowEmpty(rows[i])) {
-      endIdx = i
+  // Locate the per-order header row (Type menu / Bezorgdatum / Aantal maaltijden).
+  let headerIdx = -1
+  for (let i = 0; i < rows.length; i++) {
+    if (!rows[i]) continue
+    const lower = rows[i].map((c) => (c ?? '').toString().trim().toLowerCase())
+    if (
+      lower.includes('type menu') &&
+      lower.includes('bezorgdatum') &&
+      lower.includes('aantal maaltijden')
+    ) {
+      headerIdx = i
       break
     }
   }
+  if (headerIdx === -1) return {}
 
-  const findRow = (needle) => {
-    for (let i = headerIdx + 1; i < endIdx; i++) {
-      if (cell(rows[i], 0).toLowerCase().includes(needle)) return rows[i]
-    }
-    return null
-  }
-  const fiveRow = findRow('5 dagen')
-  const sixRow = findRow('6 dagen')
-  const sevenRow = findRow('7 dagen')
-  const readQty = (row, col) => {
-    if (!row || col == null) return 0
-    const n = parseInt(cell(row, col), 10)
-    return Number.isNaN(n) ? 0 : n
-  }
+  const header = rows[headerIdx].map((c) => (c ?? '').toString().trim().toLowerCase())
+  const idOrder = header.indexOf('order id')
+  const idType = header.indexOf('type menu')
+  const idDate = header.indexOf('bezorgdatum')
+  const idPers = header.indexOf('aantal personen')
+  const idMeals = header.indexOf('aantal maaltijden')
+  if (idType < 0 || idDate < 0 || idPers < 0 || idMeals < 0) return {}
 
-  for (const date of dates) {
-    const col = dayToColIdx[isoToDutchDay(date)]
-    const fiveDay = readQty(fiveRow, col)
-    const sixDay = readQty(sixRow, col)
-    const sevenDay = readQty(sevenRow, col)
-    if (fiveDay > 0 || sixDay > 0 || sevenDay > 0) {
-      result[date] = { fiveDay, sixDay, sevenDay }
+  const result = {}
+  const seen = new Set()
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    if (!rows[i]) continue
+    if (cell(rows[i], idType).toUpperCase() !== 'CHEF') continue
+    const orderId = cell(rows[i], idOrder)
+    if (orderId) {
+      if (seen.has(orderId)) continue // one CHEF order can span rows — count it once
+      seen.add(orderId)
     }
+    const date = cell(rows[i], idDate)
+    if (!want.has(date)) continue
+    const persons = parseInt(cell(rows[i], idPers), 10)
+    if (!persons || persons <= 0) continue
+    const meals = parseInt(cell(rows[i], idMeals), 10)
+    if (!result[date]) result[date] = { fiveDay: 0, sixDay: 0, sevenDay: 0 }
+    if (meals === 5) result[date].fiveDay += persons
+    else if (meals === 6) result[date].sixDay += persons
+    else if (meals === 7) result[date].sevenDay += persons
   }
   return result
 }
@@ -220,21 +227,19 @@ function parseKitchenOverview(filename, rows) {
   }
 
   const sectionStarts = []
-  let koksmenuHeaderIdx = -1
   for (let i = 0; i < rows.length; i++) {
     if (cell(rows[i], 0) === 'Gerechtnaam') {
       let titleIdx = i - 1
       while (titleIdx >= 0 && isRowEmpty(rows[titleIdx])) titleIdx--
       const title = cell(rows[titleIdx], 0).toLowerCase()
-      if (title.includes('koksmenu')) {
-        koksmenuHeaderIdx = i
-        continue
-      }
+      // Skip the "Totalen koksmenu per leverdag" pivot — box counts come from the raw
+      // CHEF order rows instead (that summary has been seen to over-count the boxes).
+      if (title.includes('koksmenu')) continue
       sectionStarts.push(i)
     }
   }
 
-  const koksmenuPackagesByDate = parseKoksmenuPackages(rows, koksmenuHeaderIdx, dates)
+  const koksmenuPackagesByDate = parseKoksmenuOrders(rows, dates)
 
   if (sectionStarts.length === 0) {
     return { dates, itemsByDate, koksmenuByDate, koksmenuPackagesByDate }
