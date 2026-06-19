@@ -124,10 +124,13 @@ function findColumnsByContent(ws) {
   return { courseCol, recipeCol }
 }
 
-// Map each box (courseCol) to its deduped dishes (recipeCol). A dish listed twice
-// in a box still counts once; header rows and non-day boxes are skipped.
+// Map each box (courseCol) to its dishes (recipeCol), preserving order AND
+// duplicates: a dish listed twice in a box (e.g. rice served on two of the days)
+// is kept twice, so it both shows twice in the preview and is cooked twice per
+// person when boxes are exploded into portions. Header rows and non-day boxes are
+// skipped.
 function collectBoxes(ws, courseCol, recipeCol) {
-  const buckets = { five: new Map(), six: new Map(), seven: new Map() }
+  const buckets = { five: [], six: [], seven: [] }
   ws.eachRow((row) => {
     const course = cellText(row.getCell(courseCol)).trim()
     const dish = cellText(row.getCell(recipeCol)).trim()
@@ -135,12 +138,12 @@ function collectBoxes(ws, courseCol, recipeCol) {
     const lc = course.toLowerCase()
     if (lc === 'name' || lc.includes('course information')) return
     const box = dayBox(course)
-    if (box) buckets[box].set(dish.toLowerCase(), dish)
+    if (box) buckets[box].push(dish)
   })
   return {
-    fiveDay: [...buckets.five.values()],
-    sixDay: [...buckets.six.values()],
-    sevenDay: [...buckets.seven.values()],
+    fiveDay: buckets.five,
+    sixDay: buckets.six,
+    sevenDay: buckets.seven,
   }
 }
 

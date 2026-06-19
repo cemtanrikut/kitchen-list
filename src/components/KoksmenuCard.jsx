@@ -101,8 +101,8 @@ function KoksmenuCard({ contents, onRemove }) {
               5 Günlük <span>({five.length})</span>
             </div>
             <ol className="koksmenu-list">
-              {five.map((dish) => (
-                <li key={dish}>{dish}</li>
+              {five.map((dish, i) => (
+                <li key={`${dish}-${i}`}>{dish}</li>
               ))}
             </ol>
           </div>
@@ -111,8 +111,8 @@ function KoksmenuCard({ contents, onRemove }) {
               6 Günlük <span>({six.length})</span>
             </div>
             <ol className="koksmenu-list">
-              {six.map((dish) => (
-                <li key={dish}>{dish}</li>
+              {six.map((dish, i) => (
+                <li key={`${dish}-${i}`}>{dish}</li>
               ))}
             </ol>
           </div>
@@ -121,8 +121,8 @@ function KoksmenuCard({ contents, onRemove }) {
               7 Günlük <span>({seven.length})</span>
             </div>
             <ol className="koksmenu-list">
-              {seven.map((dish) => (
-                <li key={dish}>{dish}</li>
+              {seven.map((dish, i) => (
+                <li key={`${dish}-${i}`}>{dish}</li>
               ))}
             </ol>
           </div>
